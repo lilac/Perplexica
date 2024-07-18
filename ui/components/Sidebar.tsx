@@ -14,7 +14,7 @@ const VerticalIconContainer = ({ children }: { children: ReactNode }) => {
   );
 };
 
-const Sidebar = ({ children }: { children: React.ReactNode }) => {
+const Sidebar = () => {
   const segments = useSelectedLayoutSegments();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -99,8 +99,6 @@ const Sidebar = ({ children }: { children: React.ReactNode }) => {
           </Link>
         ))}
       </div>
-
-      <Layout>{children}</Layout>
     </div>
   );
 };

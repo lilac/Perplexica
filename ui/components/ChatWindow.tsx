@@ -1,25 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Document } from '@langchain/core/documents';
+import { useEffect, useState } from 'react';
 import Navbar from './Navbar';
 import Chat from './Chat';
 import EmptyChat from './EmptyChat';
 import crypto from 'crypto';
 import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
-import { getSuggestions } from '@/lib/actions';
 import Error from 'next/error';
-
-export type Message = {
-  messageId: string;
-  chatId: string;
-  createdAt: Date;
-  content: string;
-  role: 'user' | 'assistant';
-  suggestions?: string[];
-  sources?: Document[];
-};
+import { useChat } from 'ai/react';
+import type { Message } from '@ai-sdk/react';
+export type { Message } from '@ai-sdk/react';
 
 const useSocket = (
   url: string,
@@ -245,7 +236,7 @@ const loadMessages = async (
 
   console.log('[DEBUG] messages loaded');
 
-  document.title = messages[0].content;
+  document.title = messages[0].content as string;
 
   setChatHistory(history);
   setFocusMode(data.chat.focusMode);
@@ -262,18 +253,14 @@ const ChatWindow = ({ id }: { id?: string }) => {
   const [hasError, setHasError] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
-  const [isWSReady, setIsWSReady] = useState(false);
-  const ws = useSocket(
-    process.env.NEXT_PUBLIC_WS_URL!,
-    setIsWSReady,
-    setHasError,
-  );
+  // const [isWSReady, setIsWSReady] = useState(false);
+  const { messages, setInput, append, handleSubmit, setMessages, data } = useChat();
 
   const [loading, setLoading] = useState(false);
   const [messageAppeared, setMessageAppeared] = useState(false);
 
   const [chatHistory, setChatHistory] = useState<[string, string][]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // const [messages, setMessages] = useState<Message[]>([]);
 
   const [focusMode, setFocusMode] = useState('webSearch');
 
@@ -304,19 +291,26 @@ const ChatWindow = ({ id }: { id?: string }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const messagesRef = useRef<Message[]>([]);
+  /* const messagesRef = useRef<Message[]>([]);
 
   useEffect(() => {
     messagesRef.current = messages;
-  }, [messages]);
+  }, [messages]); */
 
   useEffect(() => {
-    if (isMessagesLoaded && isWSReady) {
+    if (isMessagesLoaded) {
       setIsReady(true);
     }
-  }, [isMessagesLoaded, isWSReady]);
+  }, [isMessagesLoaded]);
 
-  const sendMessage = async (message: string) => {
+  const sendMessage = (message: string) => {
+    append({
+      role: 'user',
+      content: message,
+    })
+  }
+
+  /* const sendMessage = async (message: string) => {
     if (loading) return;
     setLoading(true);
     setMessageAppeared(false);
@@ -415,7 +409,6 @@ const ChatWindow = ({ id }: { id?: string }) => {
           ['assistant', recievedMessage],
         ]);
 
-        ws?.removeEventListener('message', messageHandler);
         setLoading(false);
 
         const lastMsg = messagesRef.current[messagesRef.current.length - 1];
@@ -438,9 +431,7 @@ const ChatWindow = ({ id }: { id?: string }) => {
         }
       }
     };
-
-    ws?.addEventListener('message', messageHandler);
-  };
+  }; */
 
   const rewrite = (messageId: string) => {
     const index = messages.findIndex((msg) => msg.messageId === messageId);

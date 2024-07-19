@@ -43,7 +43,9 @@ const Chat = ({
     messageEnd.current?.scrollIntoView({ behavior: 'smooth' });
 
     if (messages.length === 1) {
-      document.title = `${messages[0].content.substring(0, 30)} - Perplexica`;
+      const content = messages[0].content;
+      const title = typeof content === 'string' ? content.substring(0, 30) : '';
+      document.title = `${title} - Perplexica`;
     }
   }, [messages]);
 
@@ -53,7 +55,7 @@ const Chat = ({
         const isLast = i === messages.length - 1;
 
         return (
-          <Fragment key={msg.messageId}>
+          <Fragment key={i}>
             <MessageBox
               key={i}
               message={msg}

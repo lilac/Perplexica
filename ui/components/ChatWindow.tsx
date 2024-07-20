@@ -12,194 +12,11 @@ import { useChat } from 'ai/react';
 import type { Message } from '@ai-sdk/react';
 export type { Message } from '@ai-sdk/react';
 
-const useSocket = (
-  url: string,
-  setIsWSReady: (ready: boolean) => void,
-  setError: (error: boolean) => void,
-) => {
-  const [ws, setWs] = useState<WebSocket | null>(null);
-
-  useEffect(() => {
-    if (!ws) {
-      const connectWs = async () => {
-        let chatModel = localStorage.getItem('chatModel');
-        let chatModelProvider = localStorage.getItem('chatModelProvider');
-        let embeddingModel = localStorage.getItem('embeddingModel');
-        let embeddingModelProvider = localStorage.getItem(
-          'embeddingModelProvider',
-        );
-
-        if (
-          !chatModel ||
-          !chatModelProvider ||
-          !embeddingModel ||
-          !embeddingModelProvider
-        ) {
-          const providers = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/models`,
-            {
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            },
-          ).then(async (res) => await res.json());
-
-          const chatModelProviders = providers.chatModelProviders;
-          const embeddingModelProviders = providers.embeddingModelProviders;
-
-          if (
-            !chatModelProviders ||
-            Object.keys(chatModelProviders).length === 0
-          )
-            return toast.error('No chat models available');
-
-          if (
-            !embeddingModelProviders ||
-            Object.keys(embeddingModelProviders).length === 0
-          )
-            return toast.error('No embedding models available');
-
-          chatModelProvider = Object.keys(chatModelProviders)[0];
-          chatModel = Object.keys(chatModelProviders[chatModelProvider])[0];
-
-          embeddingModelProvider = Object.keys(embeddingModelProviders)[0];
-          embeddingModel = Object.keys(
-            embeddingModelProviders[embeddingModelProvider],
-          )[0];
-
-          localStorage.setItem('chatModel', chatModel!);
-          localStorage.setItem('chatModelProvider', chatModelProvider);
-          localStorage.setItem('embeddingModel', embeddingModel!);
-          localStorage.setItem(
-            'embeddingModelProvider',
-            embeddingModelProvider,
-          );
-        } else {
-          const providers = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/models`,
-            {
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            },
-          ).then(async (res) => await res.json());
-
-          const chatModelProviders = providers.chatModelProviders;
-          const embeddingModelProviders = providers.embeddingModelProviders;
-
-          if (
-            Object.keys(chatModelProviders).length > 0 &&
-            !chatModelProviders[chatModelProvider]
-          ) {
-            chatModelProvider = Object.keys(chatModelProviders)[0];
-            localStorage.setItem('chatModelProvider', chatModelProvider);
-          }
-
-          if (
-            chatModelProvider &&
-            !chatModelProviders[chatModelProvider][chatModel]
-          ) {
-            chatModel = Object.keys(chatModelProviders[chatModelProvider])[0];
-            localStorage.setItem('chatModel', chatModel);
-          }
-
-          if (
-            Object.keys(embeddingModelProviders).length > 0 &&
-            !embeddingModelProviders[embeddingModelProvider]
-          ) {
-            embeddingModelProvider = Object.keys(embeddingModelProviders)[0];
-            localStorage.setItem(
-              'embeddingModelProvider',
-              embeddingModelProvider,
-            );
-          }
-
-          if (
-            embeddingModelProvider &&
-            !embeddingModelProviders[embeddingModelProvider][embeddingModel]
-          ) {
-            embeddingModel = Object.keys(
-              embeddingModelProviders[embeddingModelProvider],
-            )[0];
-            localStorage.setItem('embeddingModel', embeddingModel);
-          }
-        }
-
-        const wsURL = new URL(url);
-        const searchParams = new URLSearchParams({});
-
-        searchParams.append('chatModel', chatModel!);
-        searchParams.append('chatModelProvider', chatModelProvider);
-
-        if (chatModelProvider === 'custom_openai') {
-          searchParams.append(
-            'openAIApiKey',
-            localStorage.getItem('openAIApiKey')!,
-          );
-          searchParams.append(
-            'openAIBaseURL',
-            localStorage.getItem('openAIBaseURL')!,
-          );
-        }
-
-        searchParams.append('embeddingModel', embeddingModel!);
-        searchParams.append('embeddingModelProvider', embeddingModelProvider);
-
-        wsURL.search = searchParams.toString();
-
-        const ws = new WebSocket(wsURL.toString());
-
-        const timeoutId = setTimeout(() => {
-          if (ws.readyState !== 1) {
-            ws.close();
-            setError(true);
-            toast.error(
-              'Failed to connect to the server. Please try again later.',
-            );
-          }
-        }, 10000);
-
-        ws.onopen = () => {
-          console.log('[DEBUG] open');
-          clearTimeout(timeoutId);
-          setError(false);
-          setIsWSReady(true);
-        };
-
-        ws.onerror = () => {
-          clearTimeout(timeoutId);
-          setError(true);
-          toast.error('WebSocket connection error.');
-        };
-
-        ws.onclose = () => {
-          clearTimeout(timeoutId);
-          setError(true);
-          console.log('[DEBUG] closed');
-        };
-
-        setWs(ws);
-      };
-
-      connectWs();
-    }
-
-    return () => {
-      if (ws?.readyState === 1) {
-        ws?.close();
-        console.log('[DEBUG] closed');
-      }
-    };
-  }, [ws, url, setIsWSReady, setError]);
-
-  return ws;
-};
 
 const loadMessages = async (
   chatId: string,
   setMessages: (messages: Message[]) => void,
   setIsMessagesLoaded: (loaded: boolean) => void,
-  setChatHistory: (history: [string, string][]) => void,
   setFocusMode: (mode: string) => void,
   setNotFound: (notFound: boolean) => void,
 ) => {
@@ -238,7 +55,6 @@ const loadMessages = async (
 
   document.title = messages[0].content as string;
 
-  setChatHistory(history);
   setFocusMode(data.chat.focusMode);
   setIsMessagesLoaded(true);
 };
@@ -254,13 +70,10 @@ const ChatWindow = ({ id }: { id?: string }) => {
   const [isReady, setIsReady] = useState(false);
 
   // const [isWSReady, setIsWSReady] = useState(false);
-  const { messages, setInput, append, handleSubmit, setMessages, data } = useChat();
+  const { messages, append, setMessages } = useChat();
 
   const [loading, setLoading] = useState(false);
   const [messageAppeared, setMessageAppeared] = useState(false);
-
-  const [chatHistory, setChatHistory] = useState<[string, string][]>([]);
-  // const [messages, setMessages] = useState<Message[]>([]);
 
   const [focusMode, setFocusMode] = useState('webSearch');
 
@@ -279,7 +92,6 @@ const ChatWindow = ({ id }: { id?: string }) => {
         chatId,
         setMessages,
         setIsMessagesLoaded,
-        setChatHistory,
         setFocusMode,
         setNotFound,
       );
@@ -290,12 +102,6 @@ const ChatWindow = ({ id }: { id?: string }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  /* const messagesRef = useRef<Message[]>([]);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]); */
 
   useEffect(() => {
     if (isMessagesLoaded) {
@@ -310,142 +116,12 @@ const ChatWindow = ({ id }: { id?: string }) => {
     })
   }
 
-  /* const sendMessage = async (message: string) => {
-    if (loading) return;
-    setLoading(true);
-    setMessageAppeared(false);
-
-    let sources: Document[] | undefined = undefined;
-    let recievedMessage = '';
-    let added = false;
-
-    const messageId = crypto.randomBytes(7).toString('hex');
-
-    ws?.send(
-      JSON.stringify({
-        type: 'message',
-        message: {
-          chatId: chatId!,
-          content: message,
-        },
-        focusMode: focusMode,
-        history: [...chatHistory, ['human', message]],
-      }),
-    );
-
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      {
-        content: message,
-        messageId: messageId,
-        chatId: chatId!,
-        role: 'user',
-        createdAt: new Date(),
-      },
-    ]);
-
-    const messageHandler = async (e: MessageEvent) => {
-      const data = JSON.parse(e.data);
-
-      if (data.type === 'error') {
-        toast.error(data.data);
-        setLoading(false);
-        return;
-      }
-
-      if (data.type === 'sources') {
-        sources = data.data;
-        if (!added) {
-          setMessages((prevMessages) => [
-            ...prevMessages,
-            {
-              content: '',
-              messageId: data.messageId,
-              chatId: chatId!,
-              role: 'assistant',
-              sources: sources,
-              createdAt: new Date(),
-            },
-          ]);
-          added = true;
-        }
-        setMessageAppeared(true);
-      }
-
-      if (data.type === 'message') {
-        if (!added) {
-          setMessages((prevMessages) => [
-            ...prevMessages,
-            {
-              content: data.data,
-              messageId: data.messageId,
-              chatId: chatId!,
-              role: 'assistant',
-              sources: sources,
-              createdAt: new Date(),
-            },
-          ]);
-          added = true;
-        }
-
-        setMessages((prev) =>
-          prev.map((message) => {
-            if (message.messageId === data.messageId) {
-              return { ...message, content: message.content + data.data };
-            }
-
-            return message;
-          }),
-        );
-
-        recievedMessage += data.data;
-        setMessageAppeared(true);
-      }
-
-      if (data.type === 'messageEnd') {
-        setChatHistory((prevHistory) => [
-          ...prevHistory,
-          ['human', message],
-          ['assistant', recievedMessage],
-        ]);
-
-        setLoading(false);
-
-        const lastMsg = messagesRef.current[messagesRef.current.length - 1];
-
-        if (
-          lastMsg.role === 'assistant' &&
-          lastMsg.sources &&
-          lastMsg.sources.length > 0 &&
-          !lastMsg.suggestions
-        ) {
-          const suggestions = await getSuggestions(messagesRef.current);
-          setMessages((prev) =>
-            prev.map((msg) => {
-              if (msg.messageId === lastMsg.messageId) {
-                return { ...msg, suggestions: suggestions };
-              }
-              return msg;
-            }),
-          );
-        }
-      }
-    };
-  }; */
-
   const rewrite = (messageId: string) => {
-    const index = messages.findIndex((msg) => msg.messageId === messageId);
+    const index = messages.findIndex((msg) => msg.id === messageId);
 
     if (index === -1) return;
 
     const message = messages[index - 1];
-
-    setMessages((prev) => {
-      return [...prev.slice(0, messages.length > 2 ? index - 1 : 0)];
-    });
-    setChatHistory((prev) => {
-      return [...prev.slice(0, messages.length > 2 ? index - 1 : 0)];
-    });
 
     sendMessage(message.content);
   };
